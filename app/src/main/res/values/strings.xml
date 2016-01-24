@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">Gentian Test App</string>
+
+    <string name="hello_world">Hello world!</string>
+    <string name="action_settings">Settings</string>
+    <string name="turn_on_flashlight">Turn on Flashligh</string>
+    <string name="turn_off_flashlight">Turn off Flashlight</string>
+</resources>

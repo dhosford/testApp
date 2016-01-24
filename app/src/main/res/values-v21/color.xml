@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="transparent">#00000000</color>
+    <color name="red">#FFFF0000</color>
+    <color name="white">#FFFFFFFF</color>
+    <color name="yellow">#FFFFE52E</color>
+    <color name="darkGreen">#FF0CE850</color>
+    <color name="blue">#FF0000FF</color>
+    <color name="PMDGreen">#42b549</color>
+    <color name="PMDBlue">#455ca9</color>
+    <color name="timer">#FF7226</color>
+    <color name="test">#FF666666</color>
+   <color name="pressed_color">#4d90fe</color>
+    <color name="default_color">#ffffff</color>
+    
+</resources>

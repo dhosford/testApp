@@ -1,0 +1,9 @@
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- When selected, use grey -->
+    <item android:drawable="@drawable/led_green_btn"
+        android:state_checked="true" />
+    <!-- When not selected, use white-->
+    <item android:drawable="@drawable/green_off_btn"
+        android:state_checked="false"/>
+
+</selector>
