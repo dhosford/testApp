@@ -15,8 +15,11 @@ import android.bluetooth.BluetoothProfile;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.database.Cursor;
 import android.graphics.Color;
 import android.media.MediaScannerConnection;
+import android.net.Uri;
+import android.net.wifi.WifiManager;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Environment;
@@ -117,7 +120,7 @@ public class SICActivity extends Activity implements BluetoothAdapter.LeScanCall
 
     String deviceName;
 
-    private boolean logging = false;
+    private boolean logging = true;
 
     SICActivity sicAct = SICActivity.this;
 
@@ -149,9 +152,22 @@ public class SICActivity extends Activity implements BluetoothAdapter.LeScanCall
 
     private Handler errTimerHandler;
 
+    private int progress;
+    private int percent;
+    private LoadingDialog cdd;
+
     private String battCharge;
+    private WifiManager wifiManager;
     private String firmware;
     private String bluetooth;
+
+    private int packetCounter = 0;
+
+    DBAdapter myDb;
+
+    private int max;
+
+    private boolean isScanRunning = false;
 
     private byte maintChar = 00000000;
 
@@ -168,7 +184,7 @@ public class SICActivity extends Activity implements BluetoothAdapter.LeScanCall
     {
         public void run()
         {
-           // getErrors();
+            // getErrors();
             //battTimerHandler.postDelayed(this, 60000);
         }
     };
@@ -183,7 +199,9 @@ public class SICActivity extends Activity implements BluetoothAdapter.LeScanCall
 
     private ImageView firmwareIV, bluetoothIV;
 
+    private int percentage = 0;
 
+    public boolean SICRunning, fpc;
 
     protected void onCreate(Bundle savedInstanceState) {
         maintChar = 00000000;
@@ -198,13 +216,20 @@ public class SICActivity extends Activity implements BluetoothAdapter.LeScanCall
         setContentView(R.layout.activity_sic);
         setProgressBarIndeterminate(true);
 
+        SICRunning = true;
+
         progressDialog = ProgressDialog.show(this, "Connecting...",
                 "Please Wait", true);
 
+        wifiManager = (WifiManager) this.getSystemService(this.WIFI_SERVICE);
+        wifiManager.setWifiEnabled(false);
+
         instance = this;
 
+        openDB();
+
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-       //Log.wtf("File Name is: ", filer);
+        //Log.wtf("File Name is: ", filer);
         /*
        xVal = (TextView) findViewById(R.id.xVal);
        yVal = (TextView) findViewById(R.id.yVal);
@@ -251,7 +276,7 @@ public class SICActivity extends Activity implements BluetoothAdapter.LeScanCall
         Intent startIntent = getIntent();
         deviceName = startIntent.getExtras().getString("DEVICE");
         int mode = startIntent.getExtras().getInt("MODE");
-
+        mode = 2;
         if (mode == 1){
             logging = false;
         }
@@ -261,7 +286,7 @@ public class SICActivity extends Activity implements BluetoothAdapter.LeScanCall
 
         label = (TextView) findViewById(R.id.label);
         if (logging){
-            label.setText("Research and Development");
+            //label.setText("Research and Development");
         }
         else {
             label.setText(deviceName);
@@ -269,7 +294,7 @@ public class SICActivity extends Activity implements BluetoothAdapter.LeScanCall
         errTimerHandler = new Handler();
 
         //blueMan = new BlueManager(getApplicationContext());
-        startScan();
+        //startScan();
         stillRunning = true;
         if(mHandler == null)
             mHandler = new LoginHandler(this);
@@ -292,6 +317,13 @@ public class SICActivity extends Activity implements BluetoothAdapter.LeScanCall
                 "-" +
                 now.get(Calendar.MILLISECOND);
 
+        if (!isScanRunning){
+            runOnUiThread(mStartRunnable);
+        }
+    }
+
+    public void end() {
+        finish();
     }
 
 
@@ -303,10 +335,8 @@ public class SICActivity extends Activity implements BluetoothAdapter.LeScanCall
          * user to settings to enable it if they have not done so.
          */
         if (mBluetoothAdapter == null || !mBluetoothAdapter.isEnabled()) {
-            //Bluetooth is disabled
-            Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
-            startActivity(enableBtIntent);
-            finish();
+            mBluetoothAdapter.enable();
+
             return;
         }
 
@@ -348,7 +378,9 @@ public class SICActivity extends Activity implements BluetoothAdapter.LeScanCall
         //Cancel any scans in progress
         mHandler.removeCallbacks(mStopRunnable);
         mHandler.removeCallbacks(mStartRunnable);
-        mBluetoothAdapter.stopLeScan(this);
+        if (mBluetoothAdapter != null){
+            mBluetoothAdapter.stopLeScan(this);
+        }
     }
 
     @Override
@@ -383,37 +415,39 @@ public class SICActivity extends Activity implements BluetoothAdapter.LeScanCall
                         .setTitle("Testing Finished")
                         .setCancelable(false)
                         .setMessage("Are you sure you wish to finish testing?")
-                        .setPositiveButton("Yes", new DialogInterface.OnClickListener() {
+                        .setPositiveButton(getResources().getString(R.string.yes), new DialogInterface.OnClickListener() {
                             @Override
                             public void onClick(DialogInterface dialog, int which) {
                                 sicAct.stillRunning = false;
-
-                                if (outfile != null){
-                                    //rescanSD(outfile);
+                                if (outfile != null) {
+                                    rescanSD(outfile);
                                 }
-
                                 runOnUiThread(new Runnable() {
                                     @Override
                                     public void run() {
                                         new Handler().postDelayed(new Runnable() {
                                             @Override
                                             public void run() {
-                                                if (mConnectedGatt != null){
+                                                if (mConnectedGatt != null) {
                                                     mConnectedGatt.close();
-                                                    battTimerHandler.removeCallbacks(null);
+
                                                 }
 
                                                 mHandler.removeCallbacks(null);
-                                                finish();
+                                                if (logging) {
+                                                    logData();
+                                                }
+                                                else{
+                                                    finish();
+                                                }
+
                                             }
                                         }, 2000);
                                     }
                                 });
-
-
                             }
                         })
-                        .setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+                        .setNegativeButton(getResources().getString(R.string.cancel), new DialogInterface.OnClickListener() {
                             @Override
                             public void onClick(DialogInterface dialog, int which) {
 
@@ -456,12 +490,12 @@ public class SICActivity extends Activity implements BluetoothAdapter.LeScanCall
         packet[0] = (byte) 0xc8;
         packet[1] = (byte) 0x47;
 
-            if(mConnectedGatt != null){
-                dataService = mConnectedGatt.getService(MAIN_SERVICE);
-            }
+        if(mConnectedGatt != null){
+            dataService = mConnectedGatt.getService(MAIN_SERVICE);
+        }
 
 
-            securityCharacteristic = dataService.getCharacteristic(SECURITY_KEY );
+        securityCharacteristic = dataService.getCharacteristic(SECURITY_KEY );
 
         if(securityCharacteristic != null){
             securityCharacteristic.setValue(packet);
@@ -489,6 +523,7 @@ public class SICActivity extends Activity implements BluetoothAdapter.LeScanCall
             maintChar ^= 1 << 2;
         }
         characteristic.setValue(new byte[] {maintChar});
+        Log.wtf(TAG, "Value is: " + characteristic.getValue().toString());
         gatt2.writeCharacteristic(characteristic);
 
     }
@@ -562,24 +597,26 @@ public class SICActivity extends Activity implements BluetoothAdapter.LeScanCall
     private Runnable mStopRunnable = new Runnable() {
         @Override
         public void run() {
+            isScanRunning = false;
             stopScan();
         }
     };
     private Runnable mStartRunnable = new Runnable() {
         @Override
         public void run() {
+            isScanRunning = true;
+            //mBluetoothAdapter.disable();
             startScan();
         }
     };
 
     private void startScan() {
-        if (mConnectedGatt != null){
-            mConnectedGatt.close();
-        }
-
+        Log.wtf(TAG, "Starting Scan");
         BluetoothManager manager = (BluetoothManager) getSystemService(BLUETOOTH_SERVICE);
         mBluetoothAdapter = manager.getAdapter();
-        //blueMan = new BlueManager(getApplicationContext());
+        if (mConnectedGatt != null) {
+            mConnectedGatt.close();
+        }
         mDevices.clear();
         mBluetoothAdapter.startLeScan(this);
         setProgressBarIndeterminateVisibility(true);
@@ -589,16 +626,19 @@ public class SICActivity extends Activity implements BluetoothAdapter.LeScanCall
     }
 
     private void stopScan() {
+        Log.wtf(TAG, "Stopping scan : " + found);
+        found = false;
         mBluetoothAdapter.stopLeScan(this);
         setProgressBarIndeterminateVisibility(false);
         found = false;
         for (BluetoothDevice x : mDevices){
             if (x.getName() == null){
-               // Log.wtf(TAG, "Null Name");
+                // Log.wtf(TAG, "Null Name");
             }
 
             else if (x.getName().equalsIgnoreCase(deviceName)){
-               // Log.wtf(TAG, "Device name is: " + deviceName);
+                Log.wtf(TAG, "Device name is: " + deviceName);
+                Log.wtf(TAG, "Device name is: " + "CONNECTING!!!!!");
                 if (progressDialog.isShowing()){
                     progressDialog.dismiss();
                 }
@@ -606,31 +646,21 @@ public class SICActivity extends Activity implements BluetoothAdapter.LeScanCall
                 BluetoothDevice device = x;
                 found = true;
                 currentDevice = device;
+                Log.wtf(TAG, "Device name is: " + "CONNECT!!!!!");
                 mConnectedGatt = device.connectGatt(this, false, mGattCallback);
+                mConnectedGatt.requestConnectionPriority(1);
                 //Display progress UI
                 mHandler.sendMessage(Message.obtain(null, MSG_PROGRESS, "Connecting to " + device.getName() + "..."));
-                battTimerHandler = new Handler();
-                battTimerHandler.postDelayed(getBatteryTimer,10000);
+
             }
 
         }
 
         if (!found && stillRunning){
-//            new AlertDialog.Builder(SICActivity.this)
-//                    .setIcon(android.R.drawable.ic_dialog_alert)
-//                    .setTitle("Device Not Found")
-//                    .setCancelable(false)
-//                    .setMessage("No Device with this name could be found. Please ensure the Barcode you are using is correct and try again.")
-//                    .setNeutralButton(getResources().getString(R.string.ok), new DialogInterface.OnClickListener()
-//                    {
-//                        @Override
-//                        public void onClick(DialogInterface dialog, int which) {
-//                            finish();
-//                        }
-//                    })
-//                    .show();
-           // Log.wtf("Device ", "not found");
-            startScan();
+            if (!isScanRunning){
+                Log.wtf(TAG, "Restarting scan");
+                runOnUiThread(mStartRunnable);
+            }
         }
     }
 
@@ -682,13 +712,13 @@ public class SICActivity extends Activity implements BluetoothAdapter.LeScanCall
                     gatt.readCharacteristic(characteristic);
                     break;
 
-               case 1:
-                Log.d(TAG, "Enabling pressure cal");
-                characteristic = gatt.getService(MAIN_SERVICE)
-                        .getCharacteristic(CONFIG_CHAR);
-                characteristic.setValue(new byte[] {0x01});
-                   gatt.writeCharacteristic(characteristic);
-                break;
+                case 1:
+                    Log.d(TAG, "Enabling pressure cal");
+                    characteristic = gatt.getService(MAIN_SERVICE)
+                            .getCharacteristic(CONFIG_CHAR);
+                    characteristic.setValue(new byte[] {0x01});
+                    gatt.writeCharacteristic(characteristic);
+                    break;
 
 
                 default:
@@ -816,8 +846,8 @@ public class SICActivity extends Activity implements BluetoothAdapter.LeScanCall
                  * If there is a failure at any stage, simply disconnect
                  */
 
-               // gatt.close();
-               // runOnUiThread(reScan);
+                // gatt.close();
+                // runOnUiThread(reScan);
             }
         }
 
@@ -860,8 +890,8 @@ public class SICActivity extends Activity implements BluetoothAdapter.LeScanCall
                 final String bluetoothRev = Byte.toString(characteristic.getValue()[2]) + "."+ Byte.toString(characteristic.getValue()[3]);
                 firmware = firmwareRev;
                 bluetooth = bluetoothRev;
-               // Log.wtf(TAG, "Firmware is : " + firmware);
-               // Log.wtf(TAG, "Bluetooth is : " + bluetooth);
+                // Log.wtf(TAG, "Firmware is : " + firmware);
+                // Log.wtf(TAG, "Bluetooth is : " + bluetooth);
                 SICActivity.getInstance().setTextviews();
                 runOnUiThread(new Runnable() {
                     public void run() {
@@ -938,7 +968,7 @@ public class SICActivity extends Activity implements BluetoothAdapter.LeScanCall
             characteristic.setValue(new byte[] {finisher});
 
             gatt.writeCharacteristic(characteristic);
-            
+
             finishStreaming();
             sicAct.stillRunning = true;
         }
@@ -992,50 +1022,50 @@ public class SICActivity extends Activity implements BluetoothAdapter.LeScanCall
             switch (msg.what) {
 
 
-                    case MSG_HUMIDITY:
-                        characteristic = (BluetoothGattCharacteristic) msg.obj;
-                        if (characteristic.getValue() == null) {
-                            Log.w(TAG, "Error obtaining humidity value");
-                            return;
-                        }
-                        updateHumidityValues(characteristic);
-                        activity.updatePressureValue(characteristic);
-                        break;
-                    case MSG_PRESSURE:
-                        characteristic = (BluetoothGattCharacteristic) msg.obj;
-                        if (characteristic.getValue() == null) {
-                            Log.w(TAG, "Error obtaining pressure value");
-                            return;
-                        }
-                        activity.updatePressureValue(characteristic);
-                        break;
-                    case MSG_PRESSURE_CAL:
-                        characteristic = (BluetoothGattCharacteristic) msg.obj;
-                        if (characteristic.getValue() == null) {
-                            Log.w(TAG, "Error obtaining cal value");
-                            return;
-                        }
-                        activity.updatePressureCals(characteristic);
-                        break;
-                    case MSG_PROGRESS:
-                        activity.mProgress.setMessage((String) msg.obj);
-                        if (!activity.mProgress.isShowing()) {
-                            activity.mProgress.show();
-                        }
-                        break;
-                    case MSG_DISMISS:
-                        activity.mProgress.hide();
-                        View decorView = activity.getWindow().getDecorView();
-                        int uiOptions = View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                                | View.SYSTEM_UI_FLAG_FULLSCREEN
-                                | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
-                        decorView.setSystemUiVisibility(uiOptions);
+                case MSG_HUMIDITY:
+                    characteristic = (BluetoothGattCharacteristic) msg.obj;
+                    if (characteristic.getValue() == null) {
+                        Log.w(TAG, "Error obtaining humidity value");
+                        return;
+                    }
+                    updateHumidityValues(characteristic);
+                    activity.updatePressureValue(characteristic);
+                    break;
+                case MSG_PRESSURE:
+                    characteristic = (BluetoothGattCharacteristic) msg.obj;
+                    if (characteristic.getValue() == null) {
+                        Log.w(TAG, "Error obtaining pressure value");
+                        return;
+                    }
+                    activity.updatePressureValue(characteristic);
+                    break;
+                case MSG_PRESSURE_CAL:
+                    characteristic = (BluetoothGattCharacteristic) msg.obj;
+                    if (characteristic.getValue() == null) {
+                        Log.w(TAG, "Error obtaining cal value");
+                        return;
+                    }
+                    activity.updatePressureCals(characteristic);
+                    break;
+                case MSG_PROGRESS:
+                    activity.mProgress.setMessage((String) msg.obj);
+                    if (!activity.mProgress.isShowing()) {
+                        activity.mProgress.show();
+                    }
+                    break;
+                case MSG_DISMISS:
+                    activity.mProgress.hide();
+                    View decorView = activity.getWindow().getDecorView();
+                    int uiOptions = View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                            | View.SYSTEM_UI_FLAG_FULLSCREEN
+                            | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
+                    decorView.setSystemUiVisibility(uiOptions);
 
-                        break;
-                    case MSG_CLEAR:
-                        clearDisplayValues();
-                        break;
-                }
+                    break;
+                case MSG_CLEAR:
+                    clearDisplayValues();
+                    break;
+            }
 
 
         }
@@ -1067,6 +1097,11 @@ public class SICActivity extends Activity implements BluetoothAdapter.LeScanCall
 
     private void updatePressureValue(BluetoothGattCharacteristic characteristic) {
         counter++;
+        packetCounter++;
+        if (packetCounter == 10){
+            Log.wtf(TAG, "10 Packets!!");
+            packetCounter = 0;
+        }
         byte[] value = characteristic.getValue();
 
         int x = twoBytesToShort(value[0], value[1]);
@@ -1080,44 +1115,49 @@ public class SICActivity extends Activity implements BluetoothAdapter.LeScanCall
         int p1 = twoBytesToShort(value[7], value[8]);
         int p2 = twoBytesToShort(value[9], value[10]);
         int spi = (int) value[11];
+        int batt = (int) value[12];
 
+        Integer[] values = {x, y, z, ref, p1, p2, spi, batt};
 
-        Integer[] values = {x, y, z, ref, p1, p2, spi};
+//        xBar.setProgress(x + 512);
+//        yBar.setProgress(y + 512);
+//        zBar.setProgress(z + 512);
 
-        xBar.setProgress(x + 512);
-        yBar.setProgress(y + 512);
-        zBar.setProgress(z + 512);
+        if (logging) {
+            DownloadWebPageTask task = new DownloadWebPageTask();
+            task.execute(values);
+        }
         /*
-        xVal.setText(""+x);
-        yVal.setText(""+y);
-        zVal.setText(""+z);
-        vRefVal.setText(""+ref);
-        p1Val.setText(""+p1);
-        p2Val.setText(""+p2);
-        */
-       // Log.wtf(TAG, "updated");
-        //Log.wtf("X Value", "" + x);
-        //Log.wtf("File Name before Log: ", filer);
-        //DownloadWebPageTask task = new DownloadWebPageTask();
-        //task.execute(values);
-        p1Series.appendData(new DataPoint(counter, p1), true, 100);
-        //Log.wtf("P1 VALUE: ", p1 + "");
-        float mP1 = p1;
-        float p1Value = (((float).000733)*mP1);
-        usl.setText((String.format("%.2f", round(p1Value, 2)) + " V"));
-
-        p2Series.appendData(new DataPoint(counter, p2), true, 100);
-       // Log.wtf("P1 VALUE: ", p2 + "");
-        float mP2 = p2;
-        float p2Value = ((float).000733)*mP2;
-        lsl.setText((String.format("%.2f", round(p2Value, 2)) + " V"));
-
-        vSeries.appendData(new DataPoint(counter, ref), true, 100);
-        float mRef = ref;
-        float p3Value = ((float).000733)*mRef;
-        //Log.wtf(TAG, p3Value + "");
-
-        vref.setText((String.format("%.2f", round(p3Value, 2)) + " V"));
+//        xVal.setText(""+x);
+//        yVal.setText(""+y);
+//        zVal.setText(""+z);
+//        vRefVal.setText(""+ref);
+//        p1Val.setText(""+p1);
+//        p2Val.setText(""+p2);
+//        */
+//        // Log.wtf(TAG, "updated");
+//        //Log.wtf("X Value", "" + x);
+//        //Log.wtf("File Name before Log: ", filer);
+//        //DownloadWebPageTask task = new DownloadWebPageTask();
+//        //task.execute(values);
+//        p1Series.appendData(new DataPoint(counter, p1), false, 100);
+//        //Log.wtf("P1 VALUE: ", p1 + "");
+//        float mP1 = p1;
+//        float p1Value = (((float).000733)*mP1);
+//        usl.setText((String.format("%.2f", round(p1Value, 2)) + " V"));
+//
+//        p2Series.appendData(new DataPoint(counter, p2), false, 100);
+//        // Log.wtf("P1 VALUE: ", p2 + "");
+//        float mP2 = p2;
+//        float p2Value = ((float).000733)*mP2;
+//        lsl.setText((String.format("%.2f", round(p2Value, 2)) + " V"));
+//
+//        vSeries.appendData(new DataPoint(counter, ref), false, 100);
+//        float mRef = ref;
+//        float p3Value = ((float).000733)*mRef;
+//        //Log.wtf(TAG, p3Value + "");
+//
+//        vref.setText((String.format("%.2f", round(p3Value, 2)) + " V"));
     }
 
     public static float round(float d, int decimalPlace) {
@@ -1290,7 +1330,8 @@ public class SICActivity extends Activity implements BluetoothAdapter.LeScanCall
     private class DownloadWebPageTask extends AsyncTask<Integer, Void, String> {
         @Override
         protected String doInBackground(Integer... params) {
-            int x,y,z,ref,p1,p2, spi;
+
+            int x, y, z, ref, p1, p2, spi, batt;
             x = params[0];
             y = params[1];
             z = params[2];
@@ -1298,19 +1339,66 @@ public class SICActivity extends Activity implements BluetoothAdapter.LeScanCall
             p1 = params[4];
             p2 = params[5];
             spi = params[6];
-        /*
-        xVal.setText(""+x);
-        yVal.setText(""+y);
-        zVal.setText(""+z);
-        vRefVal.setText(""+ref);
-        p1Val.setText(""+p1);
-        p2Val.setText(""+p2);
-        */
-           // Log.wtf("File Name is: ", filer);
-          //  Log.wtf(TAG, "writing data to log");
-            String directoryPath = Environment.getExternalStorageDirectory().getAbsolutePath() + "/pmd-respirasense-logs/";
+            batt = params[7];
+
+
+
+            String directoryPath = GlobalValues.FilePaths.MAINT_DIRECTORY_PATH;
             Calendar now = Calendar.getInstance();
-            String timestamp = 	now.get(Calendar.DAY_OF_MONTH) +
+            String timestamp = now.get(Calendar.DAY_OF_MONTH) +
+                    "-" +
+                    (now.get(Calendar.MONTH) + 1) +
+                    "-" +
+                    now.get(Calendar.YEAR) +
+                    "_" +
+                    now.get(Calendar.HOUR_OF_DAY) +
+                    "-" +
+                    now.get(Calendar.MINUTE) +
+                    "-" +
+                    now.get(Calendar.SECOND) +
+                    "-" +
+                    now.get(Calendar.MILLISECOND);
+            myDb.insertRow(timestamp, x, y, z, ref, p1, p2, spi, batt);
+            return null;
+        }
+
+        @Override
+        protected void onPostExecute(String result) {
+            //Log.wtf("AsyncTask: ", "Data Logged");
+        }
+    }
+
+    private void openDB() {
+        myDb = new DBAdapter(this);
+        myDb.open();
+    }
+
+
+    private void logData() {
+        max =(int) myDb.getSize();
+        runOnUiThread(new Runnable() {
+            public void run() {
+                cdd = new LoadingDialog(SICActivity.this);
+                cdd.setCancelable(false);
+                cdd.show();
+                cdd.setMax(myDb.getSize());
+            }
+        });
+
+        DBtoCSV task = new DBtoCSV();
+        task.execute("something");
+
+    }
+
+    private class DBtoCSV extends AsyncTask<String, Void, String> {
+        @Override
+        protected String doInBackground(String... params) {
+            //outfile = null;
+            // Log.wtf("File Name is: ", filer);
+            //Log.wtf(TAG, "writing data to log");
+            String directoryPath = GlobalValues.FilePaths.MAINT_DIRECTORY_PATH;
+            Calendar now = Calendar.getInstance();
+            String timestamp = now.get(Calendar.DAY_OF_MONTH) +
                     "-" +
                     (now.get(Calendar.MONTH) + 1) +
                     "-" +
@@ -1328,34 +1416,104 @@ public class SICActivity extends Activity implements BluetoothAdapter.LeScanCall
             //String name = btDevice.getName();
 
             //"2" prefixed for all error logs, "1" prefixed for maintenance logs
-            String contents = timestamp + ", " + x + ", " + y + ", " + z + ", " + ref + ", " + p1 + ", " + p2 +", "+ spi + ", " + battCharge;
 
-            try{
+
+            try {
                 File directory = new File(directoryPath);
-                if(directory.exists() == false){
+                if (directory.exists() == false) {
                     directory.mkdirs();
                 }
                 outfile = new File(directoryPath, fileName);
 
                 PrintWriter out = new PrintWriter(new BufferedWriter(new FileWriter(outfile, true)));
-                if (outfile.exists() == false){
+                if (outfile.exists() == false) {
                     outfile.createNewFile();
                 }
-                out.print(contents);
-                out.append("\r\n");
+                Cursor cursor = myDb.getAllRows();
+                if (cursor != null) {
+
+                    while (cursor.moveToNext()) {
+                        String contents;
+                        contents = cursor.getInt(0) + ",";
+                        contents += cursor.getString(1)
+                                + ",";
+                        contents += cursor.getInt(2)
+                                + ",";
+                        contents += cursor.getInt(3)
+                                + ",";
+                        contents += cursor.getInt(4)
+                                + ",";
+                        contents += cursor.getInt(5)
+                                + ",";
+                        contents += cursor.getInt(6)
+                                + ",";
+                        contents += cursor.getInt(7)
+                                + ",";
+                        contents += cursor.getInt(8)
+                                + ",";
+                        contents += cursor.getInt(9);
+                        out.print(contents);
+                        out.append("\r\n");
+                        progress = cursor.getInt(0);
+                        percent= (int)((progress* 100.0f)  / max);
+                        cdd.setProgress(progress);
+
+                        if ((percent > percentage) && !(percent>100)){
+                            runOnUiThread(new Runnable() {
+                                public void run() {
+                                    cdd.setPrecentage(percent);
+                                    //percentage = percent;
+                                    percentage = percent;
+                                }
+                            });
+
+                        }
+
+
+                    }
+                    cursor.close();
+                }
                 out.close();
-            }catch(Exception e){
+            } catch (Exception e) {
                 Log.e(TAG, "@CREATE FILE");
             }
-
+            if (outfile != null) {
+                rescanSD(outfile);
+            }
+            myDb.close();
+            SICActivity.this.deleteDatabase("LOGS");
 
             return null;
         }
 
+
         @Override
         protected void onPostExecute(String result) {
-           // Log.wtf("AsyncTask: ", "Data Logged");
+            Log.wtf("AsyncTask: ", "File made");
+            cdd.finish(filer);
         }
+
+        @Override
+        protected void onProgressUpdate(Void... values) {
+            super.onProgressUpdate(values);
+        }
+
+    }
+    private void rescanSD(final File toScan) {
+
+        MediaScannerConnection.MediaScannerConnectionClient MSCC = new MediaScannerConnection.MediaScannerConnectionClient() {
+
+            public void onScanCompleted(String path, Uri uri) {
+                Log.i(TAG, "Media Scan Completed.");
+            }
+
+            public void onMediaScannerConnected() {
+                MSC.scanFile(toScan.getAbsolutePath(), null);
+                Log.i(TAG, "Media Scanner Connected.");
+            }
+        };
+        MSC = new MediaScannerConnection(getApplicationContext(), MSCC);
+        MSC.connect();
     }
 }
 
