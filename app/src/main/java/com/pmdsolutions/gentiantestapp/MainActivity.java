@@ -9,6 +9,7 @@ import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCallback;
 import android.bluetooth.BluetoothGattCharacteristic;
 import android.bluetooth.BluetoothGattDescriptor;
+import android.bluetooth.BluetoothGattService;
 import android.bluetooth.BluetoothManager;
 import android.bluetooth.BluetoothProfile;
 import android.content.DialogInterface;
@@ -19,21 +20,15 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
 import android.util.Log;
-import android.util.SparseArray;
-import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
-import android.view.ViewGroup;
-import android.widget.AbsListView;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.ImageButton;
-import android.widget.ImageView;
 import android.widget.ListView;
 import android.widget.RelativeLayout;
-import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -46,14 +41,13 @@ import com.pmdsolutions.gentiantestapp.support.ScanModeDialog;
 
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
-import java.util.Map;
 import java.util.UUID;
 
 
 
 public class MainActivity extends Activity implements View.OnClickListener, BluetoothAdapter.LeScanCallback {
 
-    private static final UUID MAIN_SERVICE = UUID.fromString("0000FFB0-0000-1000-8000-00805f9b34fb");
+    private static final UUID MAIN_SERVICE = UUID.fromString("0000FFF0-0000-1000-8000-00805f9b34fb");
     private static final UUID DATA_CHAR = UUID.fromString("0000FFB1-0000-1000-8000-00805f9b34fb");
 
     private static final UUID REMAME_SERVICE = UUID.fromString("0000FFF0-0000-1000-8000-00805f9b34fb");
@@ -64,7 +58,9 @@ public class MainActivity extends Activity implements View.OnClickListener, Blue
     private static final UUID CONFIG_CHAR = UUID.fromString("0000FFB2-0000-1000-8000-00805f9b34fb");
 
     private static final UUID CONFIG_DESCRIPTOR = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb");
-    private static final UUID FINISH  = UUID.fromString("0000FFF8-0000-1000-8000-00805f9b34fb");
+    private static final UUID FINISH  = UUID.fromString("0000FFF4-0000-1000-8000-00805f9b34fb");
+
+    private final UUID SECURITY_KEY             = UUID.fromString("0000FFFD-0000-1000-8000-00805f9b34fb");
 
     private final UUID BATTERY_SERVICE_UUID	 	 = UUID.fromString("0000180F-0000-1000-8000-00805f9b34fb");
     private final UUID BATTERY_CHAR_UUID		 = UUID.fromString("00002a19-0000-1000-8000-00805f9b34fb");
@@ -331,7 +327,7 @@ public class MainActivity extends Activity implements View.OnClickListener, Blue
                                         BluetoothGattCharacteristic characteristic;
 
                                         Log.d(TAG, "Disabling Sensors");
-                                        characteristic = gatt2.getService(REMAME_SERVICE)
+                                        characteristic = gatt2.getService(MAIN_SERVICE)
                                                 .getCharacteristic(FINISH);
                                         byte finisher = 0x01;
                                         characteristic.setValue(new byte[] {finisher});
@@ -545,7 +541,29 @@ public class MainActivity extends Activity implements View.OnClickListener, Blue
              * working through the sensors we need to enable
              */
             reset();
-            disableSensors(gatt);
+            writeSecurity();
+            //disableSensors(gatt);
+        }
+
+        private void writeSecurity() {
+            BluetoothGattCharacteristic securityCharacteristic = null;
+            BluetoothGattService dataService = null;
+            byte[] packet = new byte [2];
+            packet[0] = (byte) 0xc8;
+            packet[1] = (byte) 0x47;
+
+            if(mConnectedGatt != null){
+                dataService = mConnectedGatt.getService(MAIN_SERVICE);
+            }
+
+
+            securityCharacteristic = dataService.getCharacteristic(SECURITY_KEY );
+
+            if(securityCharacteristic != null){
+                securityCharacteristic.setValue(packet);
+
+                mConnectedGatt.writeCharacteristic(securityCharacteristic);
+            }
         }
 
         @Override
@@ -574,6 +592,9 @@ public class MainActivity extends Activity implements View.OnClickListener, Blue
         public void onCharacteristicWrite(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status) {
             //After writing the enable flag, next we read the initial value
             //setNotifyNextSensor(gatt);
+            if(characteristic.getUuid().toString().equalsIgnoreCase(String.valueOf(SECURITY_KEY))){
+                disableSensors(gatt);
+            }
             if (!connected){
                 mConnectedGatt.close();
                 connected = true;
@@ -614,7 +635,7 @@ public class MainActivity extends Activity implements View.OnClickListener, Blue
             BluetoothGattCharacteristic characteristic;
             gatt2 = gatt;
             Log.d(TAG, "Disabling Sensors");
-            characteristic = gatt.getService(REMAME_SERVICE)
+            characteristic = gatt.getService(MAIN_SERVICE)
                     .getCharacteristic(FINISH);
             byte finisher = 0x08;
             characteristic.setValue(new byte[] {finisher});
@@ -688,7 +709,7 @@ public class MainActivity extends Activity implements View.OnClickListener, Blue
                                     Log.d(TAG, "Disabling Sensors");
                                     characteristic = gatt2.getService(REMAME_SERVICE)
                                             .getCharacteristic(FINISH);
-                                    byte finisher = 0x01;
+                                    byte finisher = 0x00;
                                     characteristic.setValue(new byte[] {finisher});
 
                                     gatt2.writeCharacteristic(characteristic);

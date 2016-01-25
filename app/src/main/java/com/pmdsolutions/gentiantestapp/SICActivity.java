@@ -22,7 +22,6 @@ import android.net.Uri;
 import android.net.wifi.WifiManager;
 import android.os.AsyncTask;
 import android.os.Bundle;
-import android.os.Environment;
 import android.os.Handler;
 import android.os.Message;
 import android.util.Log;
@@ -275,8 +274,8 @@ public class SICActivity extends Activity implements BluetoothAdapter.LeScanCall
 
         Intent startIntent = getIntent();
         deviceName = startIntent.getExtras().getString("DEVICE");
+        label.setText(deviceName);
         int mode = startIntent.getExtras().getInt("MODE");
-        mode = 2;
         if (mode == 1){
             logging = false;
         }
@@ -289,7 +288,7 @@ public class SICActivity extends Activity implements BluetoothAdapter.LeScanCall
             //label.setText("Research and Development");
         }
         else {
-            label.setText(deviceName);
+            //label.setText(deviceName);
         }
         errTimerHandler = new Handler();
 
@@ -1119,45 +1118,45 @@ public class SICActivity extends Activity implements BluetoothAdapter.LeScanCall
 
         Integer[] values = {x, y, z, ref, p1, p2, spi, batt};
 
-//        xBar.setProgress(x + 512);
-//        yBar.setProgress(y + 512);
-//        zBar.setProgress(z + 512);
+        xBar.setProgress(x + 512);
+        yBar.setProgress(y + 512);
+        zBar.setProgress(z + 512);
 
         if (logging) {
             DownloadWebPageTask task = new DownloadWebPageTask();
             task.execute(values);
         }
         /*
-//        xVal.setText(""+x);
-//        yVal.setText(""+y);
-//        zVal.setText(""+z);
-//        vRefVal.setText(""+ref);
-//        p1Val.setText(""+p1);
-//        p2Val.setText(""+p2);
-//        */
-//        // Log.wtf(TAG, "updated");
-//        //Log.wtf("X Value", "" + x);
-//        //Log.wtf("File Name before Log: ", filer);
-//        //DownloadWebPageTask task = new DownloadWebPageTask();
-//        //task.execute(values);
-//        p1Series.appendData(new DataPoint(counter, p1), false, 100);
-//        //Log.wtf("P1 VALUE: ", p1 + "");
-//        float mP1 = p1;
-//        float p1Value = (((float).000733)*mP1);
-//        usl.setText((String.format("%.2f", round(p1Value, 2)) + " V"));
-//
-//        p2Series.appendData(new DataPoint(counter, p2), false, 100);
-//        // Log.wtf("P1 VALUE: ", p2 + "");
-//        float mP2 = p2;
-//        float p2Value = ((float).000733)*mP2;
-//        lsl.setText((String.format("%.2f", round(p2Value, 2)) + " V"));
-//
-//        vSeries.appendData(new DataPoint(counter, ref), false, 100);
-//        float mRef = ref;
-//        float p3Value = ((float).000733)*mRef;
-//        //Log.wtf(TAG, p3Value + "");
-//
-//        vref.setText((String.format("%.2f", round(p3Value, 2)) + " V"));
+        xVal.setText(""+x);
+        yVal.setText(""+y);
+        zVal.setText(""+z);
+        vRefVal.setText(""+ref);
+        p1Val.setText(""+p1);
+        p2Val.setText(""+p2);
+        */
+        // Log.wtf(TAG, "updated");
+        //Log.wtf("X Value", "" + x);
+        //Log.wtf("File Name before Log: ", filer);
+        //DownloadWebPageTask task = new DownloadWebPageTask();
+        //task.execute(values);
+        p1Series.appendData(new DataPoint(counter, p1), true, 100);
+        //Log.wtf("P1 VALUE: ", p1 + "");
+        float mP1 = p1;
+        float p1Value = (((float).000733)*mP1);
+        usl.setText((String.format("%.2f", round(p1Value, 2)) + " V"));
+
+        p2Series.appendData(new DataPoint(counter, p2), true, 100);
+        // Log.wtf("P1 VALUE: ", p2 + "");
+        float mP2 = p2;
+        float p2Value = ((float).000733)*mP2;
+        lsl.setText((String.format("%.2f", round(p2Value, 2)) + " V"));
+
+        vSeries.appendData(new DataPoint(counter, ref), true, 100);
+        float mRef = ref;
+        float p3Value = ((float).000733)*mRef;
+        //Log.wtf(TAG, p3Value + "");
+
+        vref.setText((String.format("%.2f", round(p3Value, 2)) + " V"));
     }
 
     public static float round(float d, int decimalPlace) {
