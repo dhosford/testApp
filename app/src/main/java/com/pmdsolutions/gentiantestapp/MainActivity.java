@@ -149,10 +149,11 @@ public class MainActivity extends Activity implements View.OnClickListener, Blue
         setContentView(R.layout.activity_main);
 
         instance = this;
+        progressDialog = new ProgressDialog(this);
 
         BluetoothManager manager = (BluetoothManager) getSystemService(BLUETOOTH_SERVICE);
         mBluetoothAdapter = manager.getAdapter();
-
+        mBluetoothAdapter.enable();
         mDevices = new ArrayList<BluetoothDevice>();
         attachOnClickListeners();
 
@@ -177,7 +178,9 @@ public class MainActivity extends Activity implements View.OnClickListener, Blue
             Log.wtf(TAG, "Null Name!");
         }
         else if (!mDevices.contains(device)){
-            arrayAdapter.add(device.getName());
+            if (device.getName()!=null){
+                arrayAdapter.add(device.getName());
+            }
             mDevices.add(device);
             arrayAdapter.notifyDataSetChanged();
         }
@@ -253,10 +256,9 @@ public class MainActivity extends Activity implements View.OnClickListener, Blue
     }
 
     public void launchIdentify() {
-        progressDialog = ProgressDialog.show(this, "Scanning...",
-                "Please Wait", true);
         mDevices.clear();
-        startScan(2);
+        showDeviceDialog();
+        startScan(1);
 //        ScanModeDialog smd = new ScanModeDialog(MainActivity.this);
 //        smd.setCancelable(true);
 //        smd.show();
@@ -688,6 +690,7 @@ public class MainActivity extends Activity implements View.OnClickListener, Blue
     }
 
     public void launchBluetooth() {
+        mBluetoothAdapter.enable();
         showDeviceDialog();
 //        progressDialog = ProgressDialog.show(this, "Scanning...",
 //                "Please Wait", true);
