@@ -60,24 +60,24 @@ public class SICActivity extends Activity implements BluetoothAdapter.LeScanCall
 
     private static final String TAG = "BluetoothGattActivity";
 
-    private static final UUID MAIN_SERVICE = UUID.fromString("0000FFF0-0000-1000-8000-00805f9b34fb");
-    private static final UUID DATA_CHAR = UUID.fromString("0000FFF6-0000-1000-8000-00805f9b34fb");
+    private static final UUID MAIN_SERVICE      = UUID.fromString("0000FFF0-0000-1000-8000-00805f9b34fb");
+    private static final UUID DATA_CHAR         = UUID.fromString("0000FFF6-0000-1000-8000-00805f9b34fb");
 
-    private static final UUID REMAME_SERVICE = UUID.fromString("0000FFe0-0000-1000-8000-00805f9b34fb");
-    private static final UUID REMAME_CHAR = UUID.fromString("0000FFF4-0000-1000-8000-00805f9b34fb");
+    private static final UUID REMAME_SERVICE    = UUID.fromString("0000FFe0-0000-1000-8000-00805f9b34fb");
+    private static final UUID REMAME_CHAR       = UUID.fromString("0000FFF4-0000-1000-8000-00805f9b34fb");
 
-    private static final UUID SILENCE_CHAR = UUID.fromString("0000fff5-0000-1000-8000-00805f9b34fb");
-    private static final UUID ERROR_CHAR = UUID.fromString("0000ffe1-0000-1000-8000-00805f9b34fb");
+    private static final UUID SILENCE_CHAR      = UUID.fromString("0000fff5-0000-1000-8000-00805f9b34fb");
+    private static final UUID ERROR_CHAR        = UUID.fromString("0000ffe1-0000-1000-8000-00805f9b34fb");
 
-    private static final UUID CONFIG_CHAR = UUID.fromString("0000FFF7-0000-1000-8000-00805f9b34fb");
+    private static final UUID CONFIG_CHAR       = UUID.fromString("0000FFF7-0000-1000-8000-00805f9b34fb");
 
     private static final UUID CONFIG_DESCRIPTOR = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb");
-    private static final UUID FINISH  = UUID.fromString("0000FFF4-0000-1000-8000-00805f9b34fb");
+    private static final UUID FINISH            = UUID.fromString("0000FFF4-0000-1000-8000-00805f9b34fb");
 
     private final UUID SECURITY_KEY             = UUID.fromString("0000FFFD-0000-1000-8000-00805f9b34fb");
 
-    private final UUID BATTERY_SERVICE_UUID	 	 = UUID.fromString("0000180F-0000-1000-8000-00805f9b34fb");
-    private final UUID BATTERY_CHAR_UUID		 = UUID.fromString("00002a19-0000-1000-8000-00805f9b34fb");
+    private final UUID BATTERY_SERVICE_UUID	 	= UUID.fromString("0000180F-0000-1000-8000-00805f9b34fb");
+    private final UUID BATTERY_CHAR_UUID		= UUID.fromString("00002a19-0000-1000-8000-00805f9b34fb");
 
 
     private BluetoothAdapter mBluetoothAdapter;
@@ -274,7 +274,7 @@ public class SICActivity extends Activity implements BluetoothAdapter.LeScanCall
 
         Intent startIntent = getIntent();
         deviceName = startIntent.getExtras().getString("DEVICE");
-        label.setText(deviceName);
+
         int mode = startIntent.getExtras().getInt("MODE");
         if (mode == 1){
             logging = false;
@@ -284,6 +284,7 @@ public class SICActivity extends Activity implements BluetoothAdapter.LeScanCall
         }
 
         label = (TextView) findViewById(R.id.label);
+        label.setText(deviceName);
         if (logging){
             //label.setText("Research and Development");
         }
@@ -829,7 +830,7 @@ public class SICActivity extends Activity implements BluetoothAdapter.LeScanCall
                  * Once successfully connected, we must next discover all the services on the
                  * device before we can read and write their characteristics.
                  */
-                errTimerHandler.postDelayed(getErrorTimer, 8000);
+               // errTimerHandler.postDelayed(getErrorTimer, 8000);
                 gatt.discoverServices();
                 mHandler.sendMessage(Message.obtain(null, MSG_PROGRESS, "Discovering Services..."));
             } else if (status == BluetoothGatt.GATT_SUCCESS && newState == BluetoothProfile.STATE_DISCONNECTED) {
@@ -840,11 +841,11 @@ public class SICActivity extends Activity implements BluetoothAdapter.LeScanCall
                 Log.wtf("Status: ", "Disconnected");
                 //startScan();
                 //mHandler.sendEmptyMessage(MSG_DISMISS);
-            } else if (status != BluetoothGatt.GATT_SUCCESS) {
+            } else if (status != BluetoothGatt.GATT_SUCCESS && newState == BluetoothProfile.STATE_DISCONNECTED) {
                 /*
                  * If there is a failure at any stage, simply disconnect
                  */
-
+                startScan();
                 // gatt.close();
                 // runOnUiThread(reScan);
             }
@@ -1114,7 +1115,19 @@ public class SICActivity extends Activity implements BluetoothAdapter.LeScanCall
         int p1 = twoBytesToShort(value[7], value[8]);
         int p2 = twoBytesToShort(value[9], value[10]);
         int spi = (int) value[11];
-        int batt = (int) value[12];
+        String s =("0000000" + Integer.toBinaryString(0xFF & value[12])).replaceAll(".*(.{8})$", "$1");
+        if (s.charAt(0)=='1'){
+            fpc = true;
+        }
+        char[] chars = s.toCharArray();
+        chars[0] = '0';
+        s = String.valueOf(chars);
+        byte b = Byte.parseByte(s, 2);
+
+        int batt = b;
+        battCharge = batt + "";
+        battLevel.setText(battCharge + "%");
+
 
         Integer[] values = {x, y, z, ref, p1, p2, spi, batt};
 

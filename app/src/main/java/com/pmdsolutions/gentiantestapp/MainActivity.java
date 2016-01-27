@@ -96,6 +96,8 @@ public class MainActivity extends Activity implements View.OnClickListener, Blue
     public boolean function;
     private boolean test = false;
 
+    private ArrayAdapter<String> arrayAdapter;
+
     private ProgressDialog mProgress;
 
     BluetoothGatt gatt2;
@@ -175,7 +177,9 @@ public class MainActivity extends Activity implements View.OnClickListener, Blue
             Log.wtf(TAG, "Null Name!");
         }
         else if (!mDevices.contains(device)){
+            arrayAdapter.add(device.getName());
             mDevices.add(device);
+            arrayAdapter.notifyDataSetChanged();
         }
 
 
@@ -252,7 +256,7 @@ public class MainActivity extends Activity implements View.OnClickListener, Blue
         progressDialog = ProgressDialog.show(this, "Scanning...",
                 "Please Wait", true);
         mDevices.clear();
-        startScan();
+        startScan(2);
 //        ScanModeDialog smd = new ScanModeDialog(MainActivity.this);
 //        smd.setCancelable(true);
 //        smd.show();
@@ -274,10 +278,15 @@ public class MainActivity extends Activity implements View.OnClickListener, Blue
             progressDialog.dismiss();
         }
 
+
+    }
+
+    private void showDeviceDialog() {
         AlertDialog.Builder builderSingle = new AlertDialog.Builder(this);
         builderSingle.setIcon(R.drawable.ic_launcher);
         builderSingle.setTitle("Select One Name:-");
-        final ArrayAdapter<String> arrayAdapter = new ArrayAdapter<String>(this, android.R.layout.select_dialog_singlechoice);
+        arrayAdapter = new ArrayAdapter<String>(this, android.R.layout.select_dialog_singlechoice);
+        //arrayAdapter = new ArrayAdapter<String>(this, android.R.layout.select_dialog_singlechoice);
         Log.wtf("Something", mDevices.size() + "");
         for (int i=0; i < mDevices.size(); i++) {
             if (mDevices.get(i) != null)
@@ -300,6 +309,7 @@ public class MainActivity extends Activity implements View.OnClickListener, Blue
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
                         currentDevice = mDevices.get(which);
+                        stopScan();
 
                         //Display progress UI
                         //mHandler.sendMessage(Message.obtain(null, MSG_PROGRESS, "Connecting to " + currentDevice.getName() + "..."));
@@ -311,43 +321,48 @@ public class MainActivity extends Activity implements View.OnClickListener, Blue
                             scanIntent.putExtra("DEVICE", strName);
                             scanIntent.putExtra("MODE", 1);
                             startActivity(scanIntent);
-                        }
-                        else {
+                        } else {
                             mConnectedGatt = currentDevice.connectGatt(MainActivity.this, false, mGattCallback);
                             AlertDialog.Builder builderInner = new AlertDialog.Builder(MainActivity.this);
                             builderInner.setTitle(strName);
                             builderInner.setMessage("Activating Blue LED...");
                             builderInner.setPositiveButton("Finish",
-                                new DialogInterface.OnClickListener() {
+                                    new DialogInterface.OnClickListener() {
 
-                                    @Override
-                                    public void onClick(
-                                            DialogInterface dialog,
-                                            int which) {
-                                        BluetoothGattCharacteristic characteristic;
+                                        @Override
+                                        public void onClick(
+                                                DialogInterface dialog,
+                                                int which) {
+                                            BluetoothGattCharacteristic characteristic;
 
-                                        Log.d(TAG, "Disabling Sensors");
-                                        characteristic = gatt2.getService(MAIN_SERVICE)
-                                                .getCharacteristic(FINISH);
-                                        byte finisher = 0x01;
-                                        characteristic.setValue(new byte[] {finisher});
+                                            Log.d(TAG, "Disabling Sensors");
+                                            characteristic = gatt2.getService(MAIN_SERVICE)
+                                                    .getCharacteristic(FINISH);
+                                            byte finisher = 0x01;
+                                            characteristic.setValue(new byte[]{finisher});
 
-                                        gatt2.writeCharacteristic(characteristic);
-                                       connected = false;
-                                    }
-                                });
-                        builderInner.show();
-                    }
+                                            gatt2.writeCharacteristic(characteristic);
+                                            connected = false;
+                                        }
+                                    });
+                            builderInner.show();
+                        }
                     }
                 });
         builderSingle.show();
     }
 
-    private void startScan() {
+    private void startScan(int mode) {
         deviceList.clear();
         mBluetoothAdapter.startLeScan(this);
         timeoutHandler = new Handler();
-        timeoutHandler.postDelayed(mStopRunnable, 6000);
+        if (mode == 1){
+
+        }
+        else{
+            timeoutHandler.postDelayed(mStopRunnable, 6000);
+        }
+
     }
 
     public void getDevice() {
@@ -561,7 +576,6 @@ public class MainActivity extends Activity implements View.OnClickListener, Blue
 
             if(securityCharacteristic != null){
                 securityCharacteristic.setValue(packet);
-
                 mConnectedGatt.writeCharacteristic(securityCharacteristic);
             }
         }
@@ -674,10 +688,11 @@ public class MainActivity extends Activity implements View.OnClickListener, Blue
     }
 
     public void launchBluetooth() {
-        progressDialog = ProgressDialog.show(this, "Scanning...",
-                "Please Wait", true);
+        showDeviceDialog();
+//        progressDialog = ProgressDialog.show(this, "Scanning...",
+//                "Please Wait", true);
         mDevices.clear();
-        startScan();
+        startScan(1);
     }
 
     @Override
