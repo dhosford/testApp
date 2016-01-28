@@ -236,11 +236,19 @@ public class MainActivity extends Activity implements View.OnClickListener, Blue
 
         switch(v.getId()){
             case R.id.btnIdentify:
+                mBluetoothAdapter.enable();
                 launchIdentify();
                 break;
 
             case R.id.btnTestUnit:
+                if (mBluetoothAdapter.isEnabled()){
                 launchTest();
+            }
+                else{
+                    mBluetoothAdapter.enable();
+                }
+
+
                 break;
 
             default:
@@ -256,8 +264,8 @@ public class MainActivity extends Activity implements View.OnClickListener, Blue
     }
 
     public void launchIdentify() {
-        mDevices.clear();
-        showDeviceDialog();
+
+        showDeviceDialog();mDevices.clear();
         startScan(1);
 //        ScanModeDialog smd = new ScanModeDialog(MainActivity.this);
 //        smd.setCancelable(true);
@@ -354,9 +362,27 @@ public class MainActivity extends Activity implements View.OnClickListener, Blue
         builderSingle.show();
     }
 
+    @Override
+    protected void onResume() {
+        BluetoothManager manager = (BluetoothManager) getSystemService(BLUETOOTH_SERVICE);
+        mBluetoothAdapter = manager.getAdapter();
+        mBluetoothAdapter.enable();
+        super.onResume();
+    }
+
+    @Override
+    protected void onPostResume() {
+        BluetoothManager manager = (BluetoothManager) getSystemService(BLUETOOTH_SERVICE);
+        mBluetoothAdapter = manager.getAdapter();
+        mBluetoothAdapter.enable();
+        super.onPostResume();
+    }
+
     private void startScan(int mode) {
         deviceList.clear();
-        mBluetoothAdapter.startLeScan(this);
+        BluetoothManager manager = (BluetoothManager) getSystemService(BLUETOOTH_SERVICE);
+        mBluetoothAdapter = manager.getAdapter();
+        mBluetoothAdapter.enable();
         timeoutHandler = new Handler();
         if (mode == 1){
 
@@ -364,6 +390,7 @@ public class MainActivity extends Activity implements View.OnClickListener, Blue
         else{
             timeoutHandler.postDelayed(mStopRunnable, 6000);
         }
+        mBluetoothAdapter.startLeScan(this);
 
     }
 
@@ -691,10 +718,11 @@ public class MainActivity extends Activity implements View.OnClickListener, Blue
 
     public void launchBluetooth() {
         mBluetoothAdapter.enable();
+        mDevices.clear();
         showDeviceDialog();
 //        progressDialog = ProgressDialog.show(this, "Scanning...",
 //                "Please Wait", true);
-        mDevices.clear();
+
         startScan(1);
     }
 

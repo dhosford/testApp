@@ -114,6 +114,7 @@ public class BLEService extends BluetoothGattCallback {
 
     private void readData(BluetoothGatt gatt) {
         BluetoothGattCharacteristic characteristic;
+        Log.wtf("Read Data", "Should not be called");
         switch (mState) {
             case 0:
                 Log.i(TAG, "reading Status");
@@ -209,10 +210,11 @@ public class BLEService extends BluetoothGattCallback {
                 /*
                  * If there is a failure at any stage, simply disconnect
                  */
-            reset();
-            Log.wtf("Status: ", "Error");
-            mode = 5;
-            SICActivity.getInstance().reconnect(mConnectedGatt.getDevice());
+            //reset();
+            Log.wtf("Status: ", "Error " + status);
+            mConnectedGatt.connect();
+            //mode = 5;
+            //SICActivity.getInstance().reconnect(mConnectedGatt.getDevice());
             // gatt.close();
             // runOnUiThread(reScan);
         }
@@ -328,7 +330,7 @@ public class BLEService extends BluetoothGattCallback {
 //        //if packet is a data packet
 
         advance();
-        readData(gatt);
+        //readData(gatt);
     }
 
     public static String ByteArrayToString(byte[] ba)
@@ -406,7 +408,7 @@ public class BLEService extends BluetoothGattCallback {
                     switch (mode){
                         case 1:
 
-                            readData(gatt);
+                            //readData(gatt);
                             break;
                         case 2:
 
@@ -645,12 +647,11 @@ public class BLEService extends BluetoothGattCallback {
 
     private void startNotifications() {
         BluetoothGattCharacteristic characteristic;
-
-        int i = 1;
+        byte i = 0x01;
         Log.d(TAG, "Enabling Data Characteristic");
         characteristic = mConnectedGatt.getService(DATA_SERVICE)
                 .getCharacteristic(STREAMING_CONFIG);
-        characteristic.setValue(new byte[]{(byte) i});
+        characteristic.setValue(new byte[]{i});
 
         mConnectedGatt.requestConnectionPriority(1);
         mConnectedGatt.writeCharacteristic(characteristic);

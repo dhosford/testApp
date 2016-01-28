@@ -47,6 +47,7 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.PrintWriter;
 import java.lang.ref.WeakReference;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.UUID;
@@ -65,6 +66,8 @@ public class SICActivity extends Activity implements BluetoothAdapter.LeScanCall
     private static final UUID CONFIG_DESCRIPTOR = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb");
     private static final UUID FINISH            = UUID.fromString("0000FFF8-0000-1000-8000-00805f9b34fb");
     private static final UUID SECURITY_KEY      = UUID.fromString("0000FFFD-0000-1000-8000-00805f9b34fb");
+
+    private TextView usl, lsl, vref;
 
     private TextView tvFirmware, tvBluetooth;
 
@@ -243,6 +246,9 @@ public class SICActivity extends Activity implements BluetoothAdapter.LeScanCall
         mProgress = ProgressDialog.show(this, "Scanning...",
                 "Please Wait", true);
         //fillDB();
+        usl = (TextView) findViewById(R.id.tvUSL);
+        lsl = (TextView) findViewById(R.id.tvLSL);
+        vref = (TextView) findViewById(R.id.tvRef);
         if (!isScanRunning){
             runOnUiThread(mStartRunnable);
         }
@@ -267,6 +273,7 @@ public class SICActivity extends Activity implements BluetoothAdapter.LeScanCall
          */
         if (!getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE)) {
             Toast.makeText(this, "No LE Support.", Toast.LENGTH_SHORT).show();
+            //mBluetoothAdapter.disable();
             finish();
             return;
         }
@@ -292,7 +299,7 @@ public class SICActivity extends Activity implements BluetoothAdapter.LeScanCall
         mHandler.removeCallbacks(mStartRunnable);
         if (mBluetoothAdapter != null){
             mBluetoothAdapter.stopLeScan(this);
-            mBluetoothAdapter.disable();
+            //mBluetoothAdapter.disable();
         }
     }
 
@@ -339,6 +346,7 @@ public class SICActivity extends Activity implements BluetoothAdapter.LeScanCall
                                                     logData();
                                                 }
                                                 else{
+                                                    mBluetoothAdapter.disable();
                                                     finish();
                                                 }
 
@@ -743,6 +751,7 @@ public class SICActivity extends Activity implements BluetoothAdapter.LeScanCall
     }
 
     public void end() {
+        mBluetoothAdapter.disable();
         finish();
     }
 
@@ -1041,6 +1050,15 @@ public class SICActivity extends Activity implements BluetoothAdapter.LeScanCall
                 battLevel.setText(battCharge + "%");
             }
         });
+        float mP1 = p1;
+        float p1Value = (((float).000733)*mP1);
+        float mP2 = p2;
+        float p2Value = (((float).000733)*mP2);
+        float mP3 = ref;
+        float p3Value = (((float).000733)*mP3);
+        usl.setText((String.format("%.2f", round(p1Value, 2)) + " V"));
+        lsl.setText((String.format("%.2f", round(p2Value, 2)) + " V"));
+        vref.setText((String.format("%.2f", round(p3Value, 2)) + " V"));
 
         Integer[] values = {x, y, z, ref, p1, p2, spi, batt};
         xBar.setProgress(x + 512);
@@ -1056,6 +1074,12 @@ public class SICActivity extends Activity implements BluetoothAdapter.LeScanCall
             vSeries.appendData(new DataPoint(counter, ref), true, 100);
         }
 
+    }
+
+    public static float round(float d, int decimalPlace) {
+        BigDecimal bd = new BigDecimal(Float.toString(d));
+        bd = bd.setScale(decimalPlace, BigDecimal.ROUND_HALF_UP);
+        return bd.floatValue();
     }
 
     private void logData() {
