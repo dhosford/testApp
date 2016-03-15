@@ -639,8 +639,8 @@ public class SICActivity extends Activity implements BluetoothAdapter.LeScanCall
              * With services discovered, we are going to reset our state machine and start
              * working through the sensors we need to enable
              */
-            writeSecurity(gatt);
-            //setNotifyNextSensor(gatt);
+            //writeSecurity(gatt);
+            setNotifyNextSensor(gatt);
         }
 
         @Override
